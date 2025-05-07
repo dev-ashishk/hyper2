@@ -1,0 +1,44 @@
+{
+  "name": "hyper2",
+  "version": "1.0.0",
+  "description": "Hyper2 is a modern, lightweight, and modular HTTP/2 web framework built with TypeScript for Node.js. It features an intuitive router, middleware support, and async-first architecture.",
+  "main": "index.js",
+  "scripts": {
+    "run:example1": "tsx examples/basic-server/example.ts"
+  },
+  "keywords": [
+    "http2",
+    "framework",
+    "typescript",
+    "nodejs",
+    "router",
+    "middleware",
+    "server",
+    "web-framework",
+    "minimal",
+    "expressive",
+    "async",
+    "modular",
+    "body-parser",
+    "ts",
+    "hyper2",
+    "rest-api"
+  ],
+  "author": "Ashish Kumar",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/formidable": "^3.4.5",
+    "@types/node": "^22.15.14",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "formidable": "^3.5.4",
+    "raw-body": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.14.0"
+  }
+}
