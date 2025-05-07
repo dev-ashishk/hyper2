@@ -1,6 +1,6 @@
 import { Logger } from "@/utils/logger";
 
-import { IContext, Method, Middleware, Route } from "../../types";
+import { Method, Middleware, Route } from "../../types";
 import { Context } from "../context/context";
 
 export const methods = [
@@ -20,7 +20,7 @@ export class Router {
   private middlewares: Middleware[] = [];
   logger: Logger;
 
-  constructor() {
+  constructor(logger?: Logger) {
     methods.forEach((method) => {
       (this as any)[method.toLowerCase()] = (
         path: string,
@@ -117,70 +117,74 @@ export class Router {
     handler: (ctx: Context) => any,
     metadata: Record<string, any>
   ): this {
-    this.logger.info(`Mapped {${path} ${method}} route`);
-    // Convert from Context to IContext for internal storage
-    const wrappedHandler = (ctx: IContext) =>
-      handler(ctx as unknown as Context);
-    this.routes.push({ method, path, handler: wrappedHandler, metadata });
+    const [pattern, params] = this.createPattern(path);
+    this.routes.push({ method, pattern, handler, params, metadata });
+    this.logger.info(`Mapped {${method} ${path}} route`);
     return this;
+  }
+
+  private createPattern(path: string): [RegExp, string[]] {
+    // Convert route path into a regular expression pattern
+    const params: string[] = [];
+    const pattern = path
+      .replace(/:\w+/g, (match) => {
+        params.push(match.slice(1)); // Store the parameter name without ":"
+        return "([^/]+)"; // Match any characters except '/'
+      })
+      .replace(/\*/g, "(.*)"); // Match everything after the wildcard *
+
+    return [new RegExp(`^${pattern}$`), params];
   }
 
   private match(
     method: string,
     url: string
-  ): { route: Route; params: Record<string, string> } | null {
+  ): { route: any; params: Record<string, string> } | null {
     for (const route of this.routes) {
-      const matched = this.matchRoute(route.path, url);
-      if (matched && route.method === method.toUpperCase()) {
-        return { route, params: matched };
+      if (route.method === method.toUpperCase()) {
+        const match = url.match(route.pattern);
+        if (match) {
+          const params: Record<string, string> = {};
+          route.params.forEach((param, index) => {
+            params[param] = match[index + 1]; // Get the matched param value
+          });
+          return { route, params };
+        }
       }
     }
     return null;
   }
 
-  private matchRoute(
-    routePath: string,
-    url: string
-  ): Record<string, string> | null {
-    const pathParts = routePath.split("/");
-    const urlParts = url.split("/");
-    if (pathParts.length !== urlParts.length) return null;
-
-    const params: Record<string, string> = {};
-    for (let i = 0; i < pathParts.length; i++) {
-      const pathPart = pathParts[i];
-      const urlPart = urlParts[i];
-      if (pathPart.startsWith(":")) {
-        const paramName = pathPart.slice(1);
-        params[paramName] = urlPart;
-      } else if (pathPart !== urlPart) {
-        return null;
-      }
-    }
-    return params;
-  }
-
   handler() {
     return async (ctx: Context) => {
-      // Apply middlewares
-      for (const middleware of this.middlewares) {
-        await new Promise<void>((resolve, reject) => {
-          middleware(ctx.req, ctx.res, (err?: any) => {
-            if (err) reject(err);
-            else resolve();
+      try {
+        // Execute middlewares in sequence and handle errors within them
+        for (const middleware of this.middlewares) {
+          await new Promise<void>((resolve, reject) => {
+            middleware(ctx.req, ctx.res, (err?: any) =>
+              err ? reject(err) : resolve()
+            );
           });
-        });
-      }
+        }
 
-      // Match route and execute the handler
-      const match = this.match(ctx.req.method, ctx.req.url);
-      if (match) {
-        const { route, params } = match;
-        ctx.params = params;
-        ctx.routeMetadata = route.metadata;
-        await route.handler(ctx);
-      } else {
-        ctx.send({ error: "Not Found" }, 404);
+        // Match route and handle it
+        const match = this.match(ctx.req.method, ctx.req.url);
+        if (match) {
+          const { route, params } = match;
+          ctx.params = params;
+          ctx.routeMetadata = route.metadata;
+          await route.handler(ctx);
+        } else {
+          ctx.send({ error: "Not Found" }, 404);
+        }
+      } catch (err: any) {
+        // Centralized error handling
+        if (!ctx.res.headersSent) {
+          ctx.send(
+            { error: "Internal Server Error", message: err.message },
+            500
+          );
+        }
       }
     };
   }
@@ -188,12 +192,11 @@ export class Router {
   group(prefix: string, callback: () => void) {
     const previousRoutes = [...this.routes];
     this.routes = [];
-
     callback();
 
     this.routes = this.routes.map((route) => ({
       ...route,
-      path: prefix + route.path,
+      pattern: new RegExp(`^${prefix}${route.pattern.source}$`), // Apply prefix to all routes
     }));
 
     this.routes = [...previousRoutes, ...this.routes];

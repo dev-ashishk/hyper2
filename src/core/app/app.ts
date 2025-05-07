@@ -12,9 +12,9 @@ export class Http2App {
   logger: typeof Logger | Logger;
 
   constructor(appName?: string) {
-    this.router = new Router();
     this.app = this;
     this.logger = appName ? new Logger(appName) : Logger;
+    this.router = new Router();
   }
 
   use(middleware: Middleware) {

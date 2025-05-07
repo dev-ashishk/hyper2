@@ -4,6 +4,7 @@ import { Http2App } from "@/core/app";
 const { router, app } = new Http2App("Example-1");
 
 router.get("/", async (ctx: Context) => {
+  console.info("[GET /] recieved request");
   ctx.send({ message: "Welcome to Hyper2 HTTP/2 Framework!" }, 200);
 });
 

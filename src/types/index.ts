@@ -34,9 +34,10 @@ export interface IContext {
 
 export interface Route {
   method: Method;
-  path: string;
+  pattern: string | RegExp;
   handler: (ctx: IContext) => any | Promise<any>;
   metadata: Record<string, any>;
+  params: string[];
 }
 
 export type Middleware = (
